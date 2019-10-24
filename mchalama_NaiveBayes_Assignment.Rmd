@@ -1,0 +1,100 @@
+---
+title: "Predicting Delayed Flights"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+---
+```{r}
+library(readr)
+library(caret)
+library(ISLR)
+#install.packages("e1071") #install first
+library(e1071)  
+library(cluster)
+library(dplyr)
+library(pROC)
+```
+
+# Read the data and Summary
+
+```{r}
+MyData <- read.csv("FlightDelays.csv")
+summary(MyData)
+```
+
+# Clean the data
+
+```{r}
+MyData <- MyData[,c(-3,-5,-6,-7,-9,-11,-12)]
+str(MyData)
+head(MyData)
+set.seed(123)
+```
+
+# Week and Time Variables to be recorded as Factors
+
+```{r}
+MyData$DAY_WEEK <- as.factor(MyData$DAY_WEEK)
+levels(MyData$DAY_WEEK)
+MyData$CRS_DEP_TIME <- as.factor(MyData$CRS_DEP_TIME)
+levels(MyData$CRS_DEP_TIME)
+```
+
+# The outcome variable is whether the flight was delayed, and thus it has two classes (1 = delayed and 0 = on time)
+
+```{r}
+MyData$Flight.Status <- factor(MyData$Flight.Status,levels = c("delayed","ontime"),labels = c(0,1))
+```
+
+# Divide the data into training and Validation
+
+```{r}
+# 60% reserved for Training
+Train_Index <- createDataPartition(MyData$Flight.Status, p=0.6, list=FALSE)
+Training <- MyData[Train_Index,]
+# Validation is the rest 40%
+Valid_Data  <- MyData[-Train_Index,]
+```
+
+# Run the Naive Bayes model to predict whether the flight is delayed or not. Use only categorical variables for the predictor variables. 
+
+```{r}
+nb_model <-naiveBayes(Training$Flight.Status~CARRIER+DEST+ORIGIN+DAY_WEEK+CRS_DEP_TIME, data = Training)
+nb_model
+```
+
+
+# Output the confusion matrix and ROC for the validation data
+
+```{r}
+# Predicting the delayed status on Validation dataSet
+Predicted_Valid_labels <-predict(nb_model,Valid_Data)
+library("gmodels")
+# Show the confusion matrix of the classifier
+CrossTable(x=Valid_Data$Flight.Status,y=Predicted_Valid_labels, prop.chisq = FALSE) 
+nb_model <- naiveBayes(Training$Flight.Status~CARRIER+DEST+ORIGIN+DAY_WEEK+CRS_DEP_TIME,data = Training)
+#Make predictions and return probability of each class
+Predicted_Valid_labels <-predict(nb_model,Valid_Data, type = "raw")
+#show the first few values 
+head(Predicted_Valid_labels)
+```
+
+# ROC Curve for Validation Data Set
+
+```{r}
+roc(Valid_Data$Flight.Status, Predicted_Valid_labels[,2])
+plot.roc(Valid_Data$Flight.Status,Predicted_Valid_labels[,2])
+```
+
+# Output both a counts table and a proportion table outlining how many and what proportion of flights were delayed and on-time at each of the three airports.
+
+```{r}
+# Counts Table
+table(MyData$Flight.Status, MyData$DEST)
+
+# Proportion Table
+prop.table(table(MyData$Flight.Status , MyData$DEST))
+```
+
+
